@@ -34,12 +34,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "FreeRTOS.h"
-
-#include "ejsonrpc.h"
-#include "frozen.h"
 #include "sapi.h"
 
+#include "allocator.h"
+#include "ejsonrpc.h"
+#include "frozen.h"
 
 DEBUG_PRINT_ENABLE;
 
@@ -68,7 +67,7 @@ int sum(char *params, void **method_response, json_printf_callback_t *response_p
     strncpy(str, t.ptr, t.len);
     b = strtol(str, &endptr, 10);
 
-    long int *result = pvPortMalloc(sizeof(long int));
+    long int *result = gen_alloc(sizeof(long int));
     *result = a + b;
 
     *method_response = result;
@@ -84,9 +83,6 @@ jsonrpc_method_t methods[] = {
     }
 };
 
-char uart_received_string[100];
-
-
 int main(void)
 {
 
@@ -94,16 +90,33 @@ int main(void)
 
    debugPrintConfigUart( UART_USB, 115200 );
 
-   char *json_str = "{\"jsonrpc\": \"2.0\", \"method\":\"sum\", \"params\": [14, 6], \"id\": 1}";
-
+   uint8_t receivedByte;
+   int index = 0;
+   char uart_received_string[100];
    char jsonrpc_response[100];
-   execute_jsonrpc(json_str, strlen(json_str), methods, sizeof(methods)/sizeof(jsonrpc_method_t), jsonrpc_response, sizeof(jsonrpc_response));
 
-   debugPrintlnString(jsonrpc_response);
+   memset(uart_received_string, '\0', sizeof(uart_received_string));
+
+   uartWriteString(UART_USB, "Insert your jsonrpc request here:\n\r");
 
    while( TRUE )
    {
-      // Si cae en este while 1 significa que no pudo iniciar el scheduler
+      if (uartReadByte(UART_USB, &receivedByte)) {
+         if (receivedByte == '\r' && index < 100 - 1) {
+             if (execute_jsonrpc(uart_received_string, strlen(uart_received_string), methods, sizeof(methods)/sizeof(jsonrpc_method_t), jsonrpc_response, sizeof(jsonrpc_response))) {
+                 uartWriteString(UART_USB, "\n\rJSONRPC response:\n\r");
+                 uartWriteString(UART_USB, jsonrpc_response);
+             } else {
+                 uartWriteString(UART_USB, "No output written by execute_jsonrpc method. Something went wrong...");
+             }
+             index = 0;
+             memset(uart_received_string, '\0', sizeof(uart_received_string));
+             uartWriteString(UART_USB, "\n\rInsert your jsonrpc request here:\n\r");
+         } else if (index < 100 - 2) {
+             uart_received_string[index] = (char)receivedByte;
+             index++;
+         }
+      }
    }
 
    // NO DEBE LLEGAR NUNCA AQUI, debido a que a este programa se ejecuta

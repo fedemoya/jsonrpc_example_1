@@ -53,19 +53,22 @@ int sum(char *params, void **method_response, json_printf_callback_t *response_p
 
     struct json_token t;
 
-    int a, b;
+    long int a, b;
 
-    char aux[10];
+    char str[10];
+    char *endptr;
 
     json_scanf_array_elem(params, strlen(params), "", 0, &t);
-    strncpy(aux, t.ptr, t.len);
-    a = atoi(aux);
+    strncpy(str, t.ptr, t.len);
+    a = strtol(str, &endptr, 10);
+
+    memset(str, '\0', sizeof(str));
 
     json_scanf_array_elem(params, strlen(params), "", 1, &t);
-    strncpy(aux, t.ptr, t.len);
-    b = atoi(aux);
+    strncpy(str, t.ptr, t.len);
+    b = strtol(str, &endptr, 10);
 
-    int *result = pvPortMalloc(sizeof(int));
+    long int *result = pvPortMalloc(sizeof(long int));
     *result = a + b;
 
     *method_response = result;
@@ -91,10 +94,10 @@ int main(void)
 
    debugPrintConfigUart( UART_USB, 115200 );
 
-   char *json_str = "{\"jsonrpc\": \"2.0\", \"method\":\"sum\", \"params\": [4, 6], \"id\": 1}";
+   char *json_str = "{\"jsonrpc\": \"2.0\", \"method\":\"sum\", \"params\": [14, 6], \"id\": 1}";
 
    char jsonrpc_response[100];
-   int written_bytes = execute_jsonrpc(json_str, strlen(json_str), methods, sizeof(methods)/sizeof(jsonrpc_method_t), jsonrpc_response, sizeof(jsonrpc_response));
+   execute_jsonrpc(json_str, strlen(json_str), methods, sizeof(methods)/sizeof(jsonrpc_method_t), jsonrpc_response, sizeof(jsonrpc_response));
 
    debugPrintlnString(jsonrpc_response);
 

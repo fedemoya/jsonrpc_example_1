@@ -4,9 +4,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "FreeRTOS.h"
-
 #include "sapi.h"
+
+#include "allocator.h"
 
 
 int execute_jsonrpc(char *jsonrpc_req, int jsonrpc_size, jsonrpc_method_t *methods, int methods_size, char *jsonrpc_res, int response_size) {
@@ -41,7 +41,7 @@ int execute_jsonrpc(char *jsonrpc_req, int jsonrpc_size, jsonrpc_method_t *metho
 	int i;
 	for (i = 0; i < methods_size; ++i) {
 		if (strcmp(methods[i].method_name, method_name) == 0) {
-		    vPortFree(method_name);
+		    gen_free(method_name);
 			// Execute the corresponding method
 			int result = methods[i].method(params, &method_response, &response_printer);
 

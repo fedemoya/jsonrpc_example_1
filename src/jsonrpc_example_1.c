@@ -36,12 +36,101 @@
 
 #include "sapi.h"
 
+#include "FreeRTOS.h"
+#include "FreeRTOSConfig.h"
+#include "task.h"
+
 #include "allocator.h"
 #include "ejsonrpc.h"
 #include "frozen.h"
 
 DEBUG_PRINT_ENABLE;
 
+void myTask( void* taskParmPtr );
+
+/*
+ * This methods are part of the jsonrpc example.
+ */
+int sum(char *params, void **method_response, json_printf_callback_t *response_printer);
+int sum_response_printer(struct json_out *out, va_list *ap);
+
+jsonrpc_method_t methods[] = {
+    {
+        "sum",
+        sum
+    }
+};
+
+int main(void)
+{
+
+   boardConfig();
+
+   debugPrintConfigUart( UART_USB, 115200 );
+
+   // Crear tarea en freeRTOS
+   xTaskCreate(
+       myTask,                     // Funcion de la tarea a ejecutar
+         (const char *)"myTask",     // Nombre de la tarea como String amigable para el usuario
+            1000, // Tama�o del stack de la tarea
+            0,                          // Parametros de tarea
+            tskIDLE_PRIORITY+1,         // Prioridad de la tarea
+            0                           // Puntero a la tarea creada en el sistema
+     );
+
+  // Iniciar scheduler
+   vTaskStartScheduler();
+
+
+   while( TRUE )
+   {
+
+   }
+
+   // NO DEBE LLEGAR NUNCA AQUI, debido a que a este programa se ejecuta
+   // directamenteno sobre un microcontroladore y no es llamado por ningun
+   // Sistema Operativo, como en el caso de un programa para PC.
+   return 0;
+}
+
+void myTask( void* taskParmPtr )
+{
+
+    uint8_t receivedByte;
+    int index = 0;
+    char uart_received_string[100];
+    char jsonrpc_response[100];
+
+    memset(uart_received_string, '\0', sizeof(uart_received_string));
+
+    char *prompt_message = "\n\rInsert your JSON-RPC request here:\n\r";
+    uartWriteString(UART_USB, prompt_message);
+
+    while(TRUE)
+   {
+        if (uartReadByte(UART_USB, &receivedByte)) {
+             if (receivedByte == '\r' && index < 100 - 1) {
+                 if (execute_jsonrpc(uart_received_string, strlen(uart_received_string), methods, sizeof(methods)/sizeof(jsonrpc_method_t), jsonrpc_response, sizeof(jsonrpc_response))) {
+                     uartWriteString(UART_USB, "\n\rJSON-RPC response:\n\r");
+                     uartWriteString(UART_USB, jsonrpc_response);
+                 } else {
+                     uartWriteString(UART_USB, "No output written by execute_jsonrpc method. Something went wrong...");
+                 }
+                 index = 0;
+                 memset(uart_received_string, '\0', sizeof(uart_received_string));
+                 uartWriteString(UART_USB, prompt_message);
+             } else if (index < 100 - 2) {
+                 uart_received_string[index] = (char)receivedByte;
+                 index++;
+             }
+          }
+    }
+}
+
+void onFreeRTOSAssertCalled(const char *filename, int line) {
+    stdioPrintf(UART_USB, "FreeRTOS assertion failed. Filename: %s - line: %d\n\r", filename, line);
+    while(TRUE) { };
+}
 
 int sum_response_printer(struct json_out *out, va_list *ap) {
     int *method_response = va_arg(*ap, int *);
@@ -75,53 +164,3 @@ int sum(char *params, void **method_response, json_printf_callback_t *response_p
 
     return 0;
 }
-
-jsonrpc_method_t methods[] = {
-    {
-        "sum",
-        sum
-    }
-};
-
-int main(void)
-{
-
-   boardConfig();
-
-   debugPrintConfigUart( UART_USB, 115200 );
-
-   uint8_t receivedByte;
-   int index = 0;
-   char uart_received_string[100];
-   char jsonrpc_response[100];
-
-   memset(uart_received_string, '\0', sizeof(uart_received_string));
-
-   uartWriteString(UART_USB, "Insert your jsonrpc request here:\n\r");
-
-   while( TRUE )
-   {
-      if (uartReadByte(UART_USB, &receivedByte)) {
-         if (receivedByte == '\r' && index < 100 - 1) {
-             if (execute_jsonrpc(uart_received_string, strlen(uart_received_string), methods, sizeof(methods)/sizeof(jsonrpc_method_t), jsonrpc_response, sizeof(jsonrpc_response))) {
-                 uartWriteString(UART_USB, "\n\rJSONRPC response:\n\r");
-                 uartWriteString(UART_USB, jsonrpc_response);
-             } else {
-                 uartWriteString(UART_USB, "No output written by execute_jsonrpc method. Something went wrong...");
-             }
-             index = 0;
-             memset(uart_received_string, '\0', sizeof(uart_received_string));
-             uartWriteString(UART_USB, "\n\rInsert your jsonrpc request here:\n\r");
-         } else if (index < 100 - 2) {
-             uart_received_string[index] = (char)receivedByte;
-             index++;
-         }
-      }
-   }
-
-   // NO DEBE LLEGAR NUNCA AQUI, debido a que a este programa se ejecuta
-   // directamenteno sobre un microcontroladore y no es llamado por ningun
-   // Sistema Operativo, como en el caso de un programa para PC.
-   return 0;
-}
-
